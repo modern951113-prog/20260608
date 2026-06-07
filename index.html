@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Sketch</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+
+    <script src="libraries/p5.min.js"></script>
+    <script src="libraries/p5.sound.min.js"></script>
+    <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
+  </head>
+
+  <body>
+    <!-- p5.js 會自動偵測 ID 為 p5_loading 的元素，並在 preload 結束時隱藏它 -->
+    <div id="p5_loading">
+      <div class="tech-box">
+        <h1 class="loading-text">LOADING...</h1>
+        <div class="progress-bar">
+          <div class="progress-fill"></div>
+        </div>
+        <div class="mech-details">
+          <span>SYS.INIT</span>
+          <span>V 1.0.0</span>
+          <span>AWAITING CONNECTION</span>
+        </div>
+      </div>
+    </div>
+    <script src="sketch.js"></script>
+  </body>
+</html>

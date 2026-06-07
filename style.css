@@ -1,0 +1,109 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: #000;
+  color: #00ff41; /* 科技綠 */
+  font-family: 'Courier New', Courier, monospace; /* 等寬字體增加機械感 */
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+}
+
+/* --- 科技機械感讀取畫面設定 --- */
+#p5_loading {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #050505;
+  background-image: 
+    linear-gradient(rgba(0, 255, 65, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 65, 0.05) 1px, transparent 1px);
+  background-size: 30px 30px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+}
+
+.tech-box {
+  border: 2px solid #00ff41;
+  padding: 40px;
+  background-color: rgba(0, 20, 0, 0.85);
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.4), inset 0 0 20px rgba(0, 255, 65, 0.1);
+  position: relative;
+  min-width: 400px;
+}
+
+/* 製作科技感邊角裝飾 */
+.tech-box::before, .tech-box::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #00ff41;
+}
+
+.tech-box::before {
+  top: -6px;
+  left: -6px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.tech-box::after {
+  bottom: -6px;
+  right: -6px;
+  border-left: none;
+  border-top: none;
+}
+
+.loading-text {
+  margin: 0 0 20px 0;
+  font-size: 28px;
+  letter-spacing: 5px;
+  text-shadow: 0 0 8px #00ff41;
+  animation: blink 1.5s infinite; /* 閃爍動畫 */
+}
+
+.progress-bar {
+  width: 100%;
+  height: 20px;
+  border: 1px solid #00ff41;
+  padding: 3px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #00ff41;
+  width: 0%;
+  animation: load 3s infinite; /* 模擬讀取進度的動畫 */
+  box-shadow: 0 0 10px #00ff41;
+}
+
+.mech-details {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes load {
+  0% { width: 0%; }
+  20% { width: 25%; }
+  40% { width: 45%; }
+  60% { width: 70%; }
+  80% { width: 90%; }
+  100% { width: 100%; }
+}
