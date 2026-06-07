@@ -18,7 +18,8 @@ let enemyPurpleImg;
 let enemyYellowImg;
 let enemyElitePurpleImg;     // 菁英怪素材 "小紫"
 let enemyGreenImg;           // 成就怪素材 "小綠"
-let bossImg;                 // 魔王素材 "魔王"
+let bossImg;                 // 魔王素材 "大魔王"
+let bossAttackImg;           // 魔王攻擊素材 "要轉"
 let enemyObstacleImg;        // 無敵障礙物素材 "敵人"
 
 // 遊戲狀態管理
@@ -72,7 +73,8 @@ function preload() {
   enemyYellowImg = loadImage("黃色.png");
   enemyElitePurpleImg = loadImage("小紫.png"); // 載入菁英怪
   enemyGreenImg = loadImage("小綠.png");       // 載入小綠
-  bossImg = loadImage("魔王.png");             // 載入魔王 (請確認資料夾內有 魔王.png)
+  bossImg = loadImage("大魔王.png");           // 載入大魔王
+  bossAttackImg = loadImage("要轉.png");       // 載入魔王專屬攻擊
   enemyObstacleImg = loadImage("敵人.png");    // 載入無敵障礙物
   
   bgm = loadSound("音樂.mp3"); // 載入音樂檔案，請確認您的檔案名稱是否相符
@@ -521,19 +523,38 @@ function draw() {
         // 魔王進場
         if (boss.y < boss.targetY) {
           boss.y += 2;
+          boss.lastAttackTime = millis(); // 進場期間不攻擊
         } else {
-          // 魔王徘徊
+          // 魔王隨機徘徊
+          if (millis() > boss.nextMoveTime) {
+            boss.vx = random([-6, -4, 0, 4, 6]); // 隨機改變移動速度與方向
+            boss.nextMoveTime = millis() + random(500, 2000); // 下一次改變移動模式的時間
+          }
           boss.x += boss.vx;
-          if (boss.x < 250 || boss.x > windowWidth - 250) boss.vx *= -1;
+          if (boss.x < 250) { boss.x = 250; boss.vx = abs(boss.vx); }
+          if (boss.x > windowWidth - 250) { boss.x = windowWidth - 250; boss.vx = -abs(boss.vx); }
           
-          // 魔王發射障礙物攻擊
-          if (frameCount % 45 === 0) {
+          // 魔王發射專屬攻擊 (隨血量變快，最慢6秒=6000ms，最快3秒=3000ms)
+          let attackInterval = map(boss.hp, 0, boss.maxHp, 3000, 6000);
+          if (millis() - boss.lastAttackTime > attackInterval) {
+            boss.lastAttackTime = millis();
+            
+            // 每次發射兩發往下的「要轉」
             obstacles.push({
-              x: boss.x,
+              x: boss.x - 100,
               y: boss.y + 100,
-              vx: random(-3, 3), // 散彈
-              vy: 6,             // 往下射擊
-              isBossBullet: true // 標記為魔王專屬子彈
+              vx: 0,
+              vy: 8,             // 往下射擊
+              isBossBullet: true, // 標記為魔王專屬子彈
+              rotation: 0
+            });
+            obstacles.push({
+              x: boss.x + 100,
+              y: boss.y + 100,
+              vx: 0,
+              vy: 8,             // 往下射擊
+              isBossBullet: true, // 標記為魔王專屬子彈
+              rotation: 0
             });
           }
         }
@@ -582,7 +603,7 @@ function draw() {
             playerHp -= 1;
             if (playerHp <= 0) {
               resetToLogin();
-              break;
+              return; // 這裡不是迴圈，改用 return 直接結束當前的 draw 函式
             }
           }
         }
@@ -613,10 +634,12 @@ function draw() {
         obs.y += obs.vy || 0; // 如果有 Y 速度代表是魔王發射的子彈
         
         if (obs.isBossBullet) {
-          fill(255, 50, 50);
-          stroke(255, 200, 0);
-          strokeWeight(3);
-          ellipse(obs.x, obs.y, 40, 40); // 魔王子彈外觀
+          push();
+          translate(obs.x, obs.y);
+          obs.rotation = (obs.rotation || 0) + 0.2; // 不斷旋轉
+          rotate(obs.rotation);
+          image(bossAttackImg, 0, 0, 70, 70); // 繪製旋轉的專屬攻擊圖案
+          pop();
         } else {
           image(enemyObstacleImg, obs.x, obs.y, 80, 80); // 一般障礙物
         }
@@ -717,8 +740,10 @@ function spawnBoss(wWidth) {
     y: -200,      // 從畫面外上方飛入
     targetY: 200, // 最終停留在畫面上半部
     vx: 4,
-    hp: 5000,
-    maxHp: 5000
+    hp: 2000,
+    maxHp: 2000,
+    nextMoveTime: 0,
+    lastAttackTime: 0
   };
 }
 
