@@ -21,10 +21,14 @@ let detectStartTime = 0;     // 記錄符合條件的開始時間
 let successStartTime = 0;    // 記錄打勾動畫的開始時間
 let fadeInStartTime = 0;     // 記錄淡入動畫的開始時間
 const REQUIRED_TIME = 5000;  // 需維持動作 5 秒 (5000 毫秒)
+let hoverButton = null;      // 目前手部懸停的按鈕 ("START" 或是 "SETTINGS")
+let hoverStartTime = 0;      // 開始懸停的時間
+let isMusicOn = true;        // 設定：音樂是否開啟
+let isSfxOn = true;          // 設定：音效是否開啟
 
 function preload() {
-  // 強制設定 ml5 使用 CPU 運算 (可解決 WebGL 報錯，但效能會較差)
-  ml5.setBackend("cpu");
+  // 關閉 CPU 運算，讓瀏覽器使用 GPU (WebGL) 加速，大幅提升效能！
+  // ml5.setBackend("cpu");
   // 使用新版 ml5.js (v1.0+) 的 handPose 模型，注意 P 是大寫
   handpose = ml5.handPose();
   // 加入 faceMesh 臉部網格模型
@@ -57,8 +61,8 @@ function setup() {
 }
 
 function draw() {
-  // 如果是登入展示畫面或正在淡入登入畫面，直接繪製並提早返回 (不畫攝影機)
-  if (gameState === "LOGIN" || gameState === "FADE_IN") {
+  // 如果是登入展示畫面、設定畫面或正在淡入登入畫面，直接繪製並提早返回 (不畫攝影機)
+  if (gameState === "LOGIN" || gameState === "SETTINGS" || gameState === "FADE_IN") {
     drawLoginScreen();
 
     if (gameState === "FADE_IN") {
@@ -399,20 +403,203 @@ function drawLoginScreen() {
   textSize(54);
   text("FACE-TRACKING STRIKER", windowWidth / 2, windowHeight * 0.3);
   
-  textSize(20);
-  text("> DEMO MODE : SYSTEM ENGAGED <", windowWidth / 2, windowHeight * 0.38);
-
-  // 使用閃爍特效提示按下 Enter (利用 frameCount 讓文字閃爍)
+  // 讓 DEMO MODE 文字產生街機般的閃爍效果
   if (frameCount % 60 < 30) {
-    drawTechUI("SYSTEM READY.\nPRESS [ENTER] TO START GAME", '#00ff41');
+    textSize(20);
+    text("> DEMO MODE : SYSTEM ENGAGED <", windowWidth / 2, windowHeight * 0.38);
+  }
+
+  let cx = windowWidth / 2;
+  let currentHover = null;
+  let activeCursor = null;
+
+  // 處理手部游標邏輯 (支援雙手)
+  let cursors = [];
+  if (predictions.length > 0 && capture.width > 0) {
+    // 取出最多兩隻手的食指指尖 (keypoint 8)
+    let handsCount = Math.min(predictions.length, 2);
+    for (let i = 0; i < handsCount; i++) {
+      let indexFinger = predictions[i].keypoints[8];
+      // 將攝影機座標映射到全螢幕，X 軸加上反轉讓移動直覺如鏡子
+      let cX = map(indexFinger.x, 0, capture.width, windowWidth, 0);
+      let cY = map(indexFinger.y, 0, capture.height, 0, windowHeight);
+      cursors.push({ x: cX, y: cY });
+    }
+  }
+
+  if (gameState === "LOGIN") {
+    // 繪製選單按鈕
+    let btnStart = { x: cx - 150, y: windowHeight * 0.55, w: 300, h: 60, id: "START", label: "START GAME" };
+    let btnSettings = { x: cx - 150, y: windowHeight * 0.7, w: 300, h: 60, id: "SETTINGS", label: "SETTINGS" };
+
+    drawMenuButton(btnStart);
+    drawMenuButton(btnSettings);
+
+    // 檢查游標是否在按鈕內
+    for (let c of cursors) {
+      if (c.x > btnStart.x && c.x < btnStart.x + btnStart.w && c.y > btnStart.y && c.y < btnStart.y + btnStart.h) {
+        currentHover = "START";
+        activeCursor = c;
+      } else if (c.x > btnSettings.x && c.x < btnSettings.x + btnSettings.w && c.y > btnSettings.y && c.y < btnSettings.y + btnSettings.h) {
+        currentHover = "SETTINGS";
+        activeCursor = c;
+      }
+    }
+  } else if (gameState === "SETTINGS") {
+    let panelY = windowHeight * 0.55;
+
+    // 畫設定面板底框
+    fill(0, 20, 0, 200);
+    stroke('#00ff41');
+    strokeWeight(2);
+    rect(cx - 250, panelY - 50, 500, 200, 10);
+
+    fill('#00ff41');
+    noStroke();
+    textSize(24);
+    textAlign(CENTER, CENTER);
+    text("是 (YES)", cx + 50, panelY - 15);
+    text("否 (NO)", cx + 150, panelY - 15);
+
+    textAlign(RIGHT, CENTER);
+    text("音樂 (MUSIC)", cx - 20, panelY + 35);
+    text("音效 (SFX)", cx - 20, panelY + 95);
+
+    let musicYesBox = { x: cx + 30, y: panelY + 15, w: 40, h: 40 };
+    let musicNoBox = { x: cx + 130, y: panelY + 15, w: 40, h: 40 };
+    let sfxYesBox = { x: cx + 30, y: panelY + 75, w: 40, h: 40 };
+    let sfxNoBox = { x: cx + 130, y: panelY + 75, w: 40, h: 40 };
+
+    drawCheckbox(musicYesBox, isMusicOn);
+    drawCheckbox(musicNoBox, !isMusicOn);
+    drawCheckbox(sfxYesBox, isSfxOn);
+    drawCheckbox(sfxNoBox, !isSfxOn);
+
+    let btnBack = { x: cx - 150, y: panelY + 170, w: 300, h: 60, id: "BACK", label: "BACK TO MENU" };
+    drawMenuButton(btnBack);
+
+    // 檢查游標互動
+    for (let c of cursors) {
+      // 只要游標碰到方框，就改變設定 (無需停留)
+      if (c.x > musicYesBox.x && c.x < musicYesBox.x + musicYesBox.w && c.y > musicYesBox.y && c.y < musicYesBox.y + musicYesBox.h) isMusicOn = true;
+      if (c.x > musicNoBox.x && c.x < musicNoBox.x + musicNoBox.w && c.y > musicNoBox.y && c.y < musicNoBox.y + musicNoBox.h) isMusicOn = false;
+      if (c.x > sfxYesBox.x && c.x < sfxYesBox.x + sfxYesBox.w && c.y > sfxYesBox.y && c.y < sfxYesBox.y + sfxYesBox.h) isSfxOn = true;
+      if (c.x > sfxNoBox.x && c.x < sfxNoBox.x + sfxNoBox.w && c.y > sfxNoBox.y && c.y < sfxNoBox.y + sfxNoBox.h) isSfxOn = false;
+
+      // Back 按鈕需要停留 3 秒
+      if (c.x > btnBack.x && c.x < btnBack.x + btnBack.w && c.y > btnBack.y && c.y < btnBack.y + btnBack.h) {
+        currentHover = "BACK";
+        activeCursor = c;
+      }
+    }
+  }
+
+  // 根據懸停狀態更新計時器與繪製進度光圈
+  if (currentHover !== null) {
+    if (hoverButton !== currentHover) {
+      hoverButton = currentHover;
+      hoverStartTime = millis();
+    }
+    
+    let hoverDuration = millis() - hoverStartTime;
+    let progress = Math.min(hoverDuration / 3000, 1); // 停留 3 秒
+    
+    // 繪製光圈進度
+    push();
+    noFill();
+    stroke(0, 255, 65, 80);
+    strokeWeight(4);
+    ellipse(activeCursor.x, activeCursor.y, 60, 60); // 底圓
+    stroke(0, 255, 65);
+    strokeWeight(6);
+    strokeCap(ROUND);
+    arc(activeCursor.x, activeCursor.y, 60, 60, -HALF_PI, -HALF_PI + TWO_PI * progress); // 旋轉光圈
+    pop();
+
+    if (progress >= 1) {
+      // 觸發按鈕事件
+      if (hoverButton === "START") {
+        gameState = "PLAYING";
+      } else if (hoverButton === "SETTINGS") {
+        gameState = "SETTINGS";
+      } else if (hoverButton === "BACK") {
+        gameState = "LOGIN";
+      }
+      hoverButton = null;
+    }
+  } else {
+    hoverButton = null;
+  }
+
+  // 繪製一般游標點 (所有手部)
+  for (let c of cursors) {
+    push();
+    fill(0, 255, 65, 150);
+    stroke(0, 255, 65);
+    strokeWeight(2);
+    ellipse(c.x, c.y, 15, 15);
+    pop();
+  }
+
+  pop();
+}
+
+// 繪製單個選單按鈕的函式
+function drawMenuButton(btn) {
+  push();
+  fill(0, 20, 0, 200);
+  stroke('#00ff41');
+  strokeWeight(2);
+  rect(btn.x, btn.y, btn.w, btn.h, 10);
+  
+  // 滑鼠懸停時顯示反饋背景
+  if (hoverButton === btn.id) {
+    fill(0, 255, 65, 50);
+    noStroke();
+    rect(btn.x, btn.y, btn.w, btn.h, 10);
+  }
+
+  fill('#00ff41');
+  noStroke();
+  textSize(24);
+  textFont('Courier New');
+  textAlign(CENTER, CENTER);
+  text(btn.label, btn.x + btn.w / 2, btn.y + btn.h / 2);
+  pop();
+}
+
+// 繪製設定頁面核取方塊的函式
+function drawCheckbox(box, isChecked) {
+  push();
+  stroke('#00ff41');
+  strokeWeight(2);
+  if (isChecked) {
+    fill(0, 255, 65, 50);
+  } else {
+    fill(0, 20, 0, 200);
+  }
+  rect(box.x, box.y, box.w, box.h, 5);
+
+  if (isChecked) {
+    stroke('#00ff41');
+    strokeWeight(4);
+    noFill();
+    strokeCap(ROUND);
+    strokeJoin(ROUND);
+    beginShape();
+    vertex(box.x + 10, box.y + 20);
+    vertex(box.x + 18, box.y + 30);
+    vertex(box.x + 30, box.y + 10);
+    endShape();
   }
   pop();
 }
 
 // 監聽鍵盤按下事件
 function keyPressed() {
-  // 若在登入畫面按下 Enter 鍵，進入遊戲狀態
   if (gameState === "LOGIN" && keyCode === ENTER) {
     gameState = "PLAYING";
+  } else if (gameState === "SETTINGS" && keyCode === ESCAPE) {
+    gameState = "LOGIN";
   }
 }
