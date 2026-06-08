@@ -109,15 +109,6 @@ let lastBugSpawnTime = 0;    // 記錄蟲上次生成時間
 let bugPhase = 0;            // 記錄蟲生成的路線階段
 
 function preload() {
-  // 關閉 CPU 運算，讓瀏覽器使用 GPU (WebGL) 加速，大幅提升效能！
-  // ml5.setBackend("cpu");
-  // 針對 Windows 上 WebGPU powerPreference 被忽略的已知問題 (crbug.com/369219127)
-  // 我們可以強制使用 webgl 後端，以確保雙顯卡筆電能穩定調度硬體加速
-  ml5.setBackend("webgl");
-  // 使用新版 ml5.js (v1.0+) 的 handPose 模型，注意 P 是大寫
-  handpose = ml5.handPose();
-  // 加入 faceMesh 臉部網格模型
-  facemesh = ml5.faceMesh();
 
   // 載入 png 圖片素材
   planeImg = loadImage("plane.png");
@@ -167,13 +158,23 @@ function setup() {
   capture = createCapture(VIDEO);
   capture.hide();
 
-  // 開始持續偵測攝影機畫面中的手部
-  handpose.detectStart(capture, results => {
-    predictions = results;
+  // 關閉 CPU 運算，讓瀏覽器使用 GPU (WebGL) 加速，大幅提升效能！
+  // 針對 Windows 上 WebGPU powerPreference 被忽略的已知問題，強制使用 webgl
+  ml5.setBackend("webgl");
+
+  // 【將 AI 模型移到 setup，避免卡在 Loading 畫面】
+  // 使用新版 ml5.js (v1.0+) 的 handPose 與 faceMesh 模型
+  handpose = ml5.handPose(function() {
+    // 模型載入完成後，才開始持續偵測攝影機畫面中的手部
+    handpose.detectStart(capture, results => {
+      predictions = results;
+    });
   });
-  // 開始持續偵測攝影機畫面中的臉部
-  facemesh.detectStart(capture, results => {
-    facePredictions = results;
+  facemesh = ml5.faceMesh(function() {
+    // 模型載入完成後，才開始持續偵測攝影機畫面中的臉部
+    facemesh.detectStart(capture, results => {
+      facePredictions = results;
+    });
   });
 
   // 初始化星空背景
