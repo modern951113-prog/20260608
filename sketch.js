@@ -66,6 +66,7 @@ let bossShootSfx;            // 魔王射擊音效
 let orbSfx;                  // 道具球音效
 let levelUpSfx;              // 升級音效
 let bossWarningStartTime = 0;// 記錄警告過場開始時間
+let globalSfxMutedUntil = 0; // 記錄全域音效靜音結束時間
 
 // 遊戲進行中的變數
 let playerLasers = [];
@@ -187,6 +188,12 @@ function setup() {
   bossShootSfx.playMode('restart');
   orbSfx.playMode('restart');
   playerUltSfx.playMode('restart');
+
+  // 調整音量
+  levelUpSfx.setVolume(3.0); // 升級音效調大聲 (預設 1.0，調高以蓋過其他音效)
+  orbSfx.setVolume(3.0);     // 道具球音效調大聲
+  bgm.setVolume(0.3);        // 第一關背景音樂調小聲
+  bgm2.setVolume(0.3);       // 第二關背景音樂調小聲
 }
 
 function draw() {
@@ -395,7 +402,7 @@ function draw() {
           playerLasers.push({ x: planeX - 20, y: planeY - 40, type: "beam" });
           playerLasers.push({ x: planeX + 20, y: planeY - 40, type: "beam" });
         }
-        if (isSfxOn) laserSfx.play(); // 播放射擊音效
+        playSfx(laserSfx); // 播放射擊音效
       }
 
       // 處理玩家大招 (第二關專屬，且 LV3 解鎖，過關後停止)
@@ -406,7 +413,7 @@ function draw() {
         if (millis() - lastUltTime > ultInterval) {
           playerUlts.push({ spawnTime: millis() });
           lastUltTime = millis();
-          if (isSfxOn) playerUltSfx.play(); // 播放玩家大招音效
+          playSfx(playerUltSfx); // 播放玩家大招音效
         }
       }
 
@@ -600,8 +607,8 @@ function draw() {
           if (particles.length < 200) { // 限制畫面上最多只能有 200 個爆炸粒子
             particles.push({ x: e.x, y: e.y, life: 255 }); // 大爆炸
           }
-          if (isSfxOn && millis() - lastExplosionTime > 80) { // 限制每 80 毫秒最多播一次爆炸
-            try { explosionSfx.play(); } catch(e) {}
+          if (millis() - lastExplosionTime > 80) { // 限制每 80 毫秒最多播一次爆炸
+            playSfx(explosionSfx);
             lastExplosionTime = millis();
           }
           
@@ -617,7 +624,7 @@ function draw() {
             
             // 每次擊敗 10 隻普通敵人，生成一隻菁英怪小紫
             if (enemiesDefeated % 10 === 0) {
-              let eliteHp = (currentLevel === 2) ? 500 : 200; // 第二關菁英怪血量 500，第一關 200
+              let eliteHp = (currentLevel === 2) ? 1000 : 200; // 第二關菁英怪血量 1000，第一關 200
               enemies.push({ 
                 x: random(windowWidth * 0.2, windowWidth * 0.8), 
                 y: 50, 
@@ -646,7 +653,19 @@ function draw() {
               }
               leveledUp = true;
             }
-            if (leveledUp && isSfxOn) { try { levelUpSfx.play(); } catch(e) {} }
+            if (leveledUp && isSfxOn) { 
+              try { 
+                // 停止其他主要干擾音效
+                laserSfx.stop();
+                explosionSfx.stop();
+                bossShootSfx.stop();
+                orbSfx.stop();
+                playerUltSfx.stop();
+                levelUpSfx.play(); 
+                let dur = levelUpSfx.duration();
+                globalSfxMutedUntil = millis() + (dur ? dur * 1000 : 2000);
+              } catch(e) {} 
+            }
           }
           
           enemies.splice(i, 1);
@@ -669,8 +688,8 @@ function draw() {
             // 如果不是菁英怪，普通怪物撞到還是會爆炸並消失
             if (e.type !== "elite_purple") {
               particles.push({ x: e.x, y: e.y, life: 255 }); // 敵機爆炸
-              if (isSfxOn && millis() - lastExplosionTime > 80) {
-                try { explosionSfx.play(); } catch(e) {}
+              if (millis() - lastExplosionTime > 80) {
+                playSfx(explosionSfx);
                 lastExplosionTime = millis();
               }
               enemies.splice(i, 1); // 移除敵機
@@ -682,7 +701,7 @@ function draw() {
               gameOverStartTime = millis();
               bgm.stop();
               bgm2.stop();
-              if (isSfxOn) gameOverSfx.play();
+              playSfx(gameOverSfx);
               break; // 修正卡死錯誤：陣列清空後立即跳出迴圈，不再往下執行
             }
             if (e.type !== "elite_purple") continue; // 已經擊毀，跳過下方畫圖
@@ -690,7 +709,7 @@ function draw() {
         }
 
         // 繪製血條 (依據怪物類型調整最大血量與長度)
-        let maxHp = e.maxHp || (e.type === "elite_purple" ? (currentLevel === 2 ? 500 : 200) : (currentLevel === 2 ? 200 : 50));
+        let maxHp = e.maxHp || (e.type === "elite_purple" ? (currentLevel === 2 ? 1000 : 200) : (currentLevel === 2 ? 200 : 50));
         let barWidth = e.type === "elite_purple" ? 100 : 40; // 血條配合體積調整
         let yOffset = e.type === "elite_purple" ? -110 : -45; // 血條位置微調
         
@@ -744,8 +763,8 @@ function draw() {
         
         if (gm.hp <= 0) {
           particles.push({ x: gm.x, y: gm.y, life: 255 }); // 大爆炸
-          if (isSfxOn && millis() - lastExplosionTime > 80) {
-            explosionSfx.play(); // 播放爆炸音效
+          if (millis() - lastExplosionTime > 80) {
+            playSfx(explosionSfx); // 播放爆炸音效
             lastExplosionTime = millis();
           }
           greenMonsterDefeated = true; // 達成成就！
@@ -753,7 +772,7 @@ function draw() {
           levelStage = 1.5; // 進入魔王警告過場階段
           greenMonster = null;
           bossWarningStartTime = millis();
-          if (isSfxOn) warningSfx.play();
+          playSfx(warningSfx);
         }
         
         // 小綠存活 20 秒後飛走消失
@@ -761,7 +780,7 @@ function draw() {
           levelStage = 1.5; // 進入魔王警告過場階段
           greenMonster = null;
           bossWarningStartTime = millis();
-          if (isSfxOn) warningSfx.play();
+          playSfx(warningSfx);
         }
       }
 
@@ -861,7 +880,7 @@ function draw() {
               boss.isTelegraphing = false;
               boss.lastAttackTime = millis();
               
-              if (isSfxOn) bossShootSfx.play(); // 播放魔王射擊音效
+              playSfx(bossShootSfx); // 播放魔王射擊音效
               
               for (let off of offsets) {
                 obstacles.push({
@@ -889,7 +908,7 @@ function draw() {
           boss.invincibleUntil = millis() + 10000; // 無敵 10 秒
           boss.ultState = 1;
           boss.lastUltTime = millis();
-          if (isSfxOn) warningSfx.play();
+          playSfx(warningSfx);
         }
 
         // 第二關大魔王專屬：魔王大招
@@ -910,7 +929,7 @@ function draw() {
             if (ultElapsed > 5000) {
               boss.ultState = 2;
               boss.lastUltTime = millis();
-              if (isSfxOn) bossUltSfx.play(); // 魔王大招音效
+              playSfx(bossUltSfx); // 魔王大招音效
             }
           } else if (boss.ultState === 2) {
             // 發射持續 5 秒的直向衝擊波
@@ -936,7 +955,7 @@ function draw() {
               gameOverStartTime = millis();
               bgm.stop();
               bgm2.stop();
-              if (isSfxOn) gameOverSfx.play();
+              playSfx(gameOverSfx);
               return; 
             }
             
@@ -953,7 +972,7 @@ function draw() {
           // 每隔 15 秒發射一次光球彈幕 (配合光球存活 15 秒)
           if (millis() - boss.lastBarrageTime > 15000) {
             boss.lastBarrageTime = millis();
-            if (isSfxOn) bossShootSfx.play(); // 播放發射音效
+            playSfx(bossShootSfx); // 播放發射音效
             
             // 往下射出 8 個方位
             for (let i = 0; i < 8; i++) {
@@ -1042,8 +1061,8 @@ function draw() {
             for (let k = 0; k < 30; k++) { // 華麗大爆炸
               particles.push({ x: boss.x + random(-150, 150), y: boss.y + random(-150, 150), life: 255 });
             }
-            if (isSfxOn && millis() - lastExplosionTime > 80) {
-              explosionSfx.play(); // 播放爆炸音效
+            if (millis() - lastExplosionTime > 80) {
+              playSfx(explosionSfx); // 播放爆炸音效
               lastExplosionTime = millis();
             }
             score += 5000;
@@ -1053,7 +1072,7 @@ function draw() {
             victoryStartTime = millis();
             bgm.stop();
             bgm2.stop();
-            if (isSfxOn) victorySfx.play();
+            playSfx(victorySfx);
           }
         }
         
@@ -1072,7 +1091,7 @@ function draw() {
               gameOverStartTime = millis();
               bgm.stop();
               bgm2.stop();
-              if (isSfxOn) gameOverSfx.play();
+              playSfx(gameOverSfx);
               return; // 這裡不是迴圈，改用 return 直接結束當前的 draw 函式
             }
           }
@@ -1157,7 +1176,7 @@ function draw() {
               gameOverStartTime = millis();
               bgm.stop();
               bgm2.stop();
-              if (isSfxOn) gameOverSfx.play();
+              playSfx(gameOverSfx);
               break;
             }
           }
@@ -1205,8 +1224,8 @@ function draw() {
           if (p.type === "heal") playerHp += 1;
           else if (p.type === "power") playerPowerEndTime = millis() + 10000; // 10秒
           else if (p.type === "shield") { playerShieldCount = 3; playerShieldEndTime = millis() + 10000; } // 10秒
-          if (isSfxOn && millis() - lastOrbSfxTime > 100) {
-            orbSfx.play(); // 播放道具球專屬音效
+          if (millis() - lastOrbSfxTime > 100) {
+            playSfx(orbSfx); // 播放道具球專屬音效
             lastOrbSfxTime = millis();
           }
           powerUps.splice(i, 1);
@@ -1385,7 +1404,7 @@ function handleButtonHover(buttons) {
   let clickedId = null;
   if (currentHover !== null) {
     if (hoverButton !== currentHover) {
-      if (isSfxOn) hoverSfx.play();
+      playSfx(hoverSfx);
       hoverButton = currentHover;
       hoverStartTime = millis();
     }
@@ -1717,20 +1736,15 @@ function drawLoginScreen() {
   if (gameState === "LOGIN") {
     // 繪製選單按鈕
     let btnStart = { x: cx - 150, y: windowHeight * 0.45, w: 300, h: 60, id: "START", label: "START GAME" };
-    let btnJumpLvl2 = { x: cx - 150, y: windowHeight * 0.60, w: 300, h: 60, id: "LVL2", label: "DIRECT LEVEL 2" };
-    let btnSettings = { x: cx - 150, y: windowHeight * 0.75, w: 300, h: 60, id: "SETTINGS", label: "SETTINGS" };
+    let btnSettings = { x: cx - 150, y: windowHeight * 0.60, w: 300, h: 60, id: "SETTINGS", label: "SETTINGS" };
 
     drawMenuButton(btnStart);
-    drawMenuButton(btnJumpLvl2);
     drawMenuButton(btnSettings);
 
     // 檢查游標是否在按鈕內
     for (let c of cursors) {
       if (c.x > btnStart.x && c.x < btnStart.x + btnStart.w && c.y > btnStart.y && c.y < btnStart.y + btnStart.h) {
         currentHover = "START";
-        activeCursor = c;
-      } else if (c.x > btnJumpLvl2.x && c.x < btnJumpLvl2.x + btnJumpLvl2.w && c.y > btnJumpLvl2.y && c.y < btnJumpLvl2.y + btnJumpLvl2.h) {
-        currentHover = "LVL2";
         activeCursor = c;
       } else if (c.x > btnSettings.x && c.x < btnSettings.x + btnSettings.w && c.y > btnSettings.y && c.y < btnSettings.y + btnSettings.h) {
         currentHover = "SETTINGS";
@@ -1850,14 +1864,14 @@ function drawLoginScreen() {
         if (deltaX > 150 && millis() > swipeCooldown) { // 往右滑
           if (currentPlaneIndex > 0) {
             currentPlaneIndex--;
-            if (isSfxOn) hoverSfx.play();
+            playSfx(hoverSfx);
           }
           swipeCooldown = millis() + 500;
           swipeStartX = activeC.x;
         } else if (deltaX < -150 && millis() > swipeCooldown) { // 往左滑
           if (currentPlaneIndex < 1 && unlockedPlanes >= 2) {
             currentPlaneIndex++;
-            if (isSfxOn) hoverSfx.play();
+            playSfx(hoverSfx);
           }
           swipeCooldown = millis() + 500;
           swipeStartX = activeC.x;
@@ -1915,7 +1929,7 @@ function drawLoginScreen() {
   // 根據懸停狀態更新計時器與繪製進度光圈
   if (currentHover !== null) {
     if (hoverButton !== currentHover) {
-      if (isSfxOn) hoverSfx.play(); // 播放提示音
+      playSfx(hoverSfx); // 播放提示音
       hoverButton = currentHover;
       hoverStartTime = millis();
     }
@@ -2129,5 +2143,12 @@ function drawWarpScreen() {
       if (currentLevel === 1 && !bgm.isPlaying()) bgm.loop();
       else if (currentLevel === 2 && !bgm2.isPlaying()) bgm2.loop();
     }
+  }
+}
+
+// 播放音效的共用函式 (支援升等時全域靜音)
+function playSfx(sfx) {
+  if (isSfxOn && millis() > globalSfxMutedUntil) {
+    try { sfx.play(); } catch (e) {}
   }
 }
